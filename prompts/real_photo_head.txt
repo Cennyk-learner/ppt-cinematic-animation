@@ -1,0 +1,15 @@
+【用法】这是"新闻实拍质感"底图的提示词开头，后面接每张图的描述。把 <输出目录>、<地点> 换成这次的内容，
+把尖括号里"真实的杂物""普通的真实物件"换成这个题材里真实存在的东西。保留排除项那一句：去掉它，图会回到电影调色。
+每张图的描述以 [DAY] / [NIGHT of X] / [EDIT of X] / [DUSK] 开头，并写清版式（顶部 15% 留暗、底部 20% 留暗、
+主体在哪一侧、哪里留空）。例子见 real_photo_examples.md，完整跑通的一份见 examples/lighthouse/prompt_gen.txt。下面开始是正文。
+------------------------------------------------------------------------------------------------------------------------
+
+Use your built-in image generation / image editing tool (not code, not a script) for every image below. Produce them ONE AFTER ANOTHER. Save each into the <输出目录>/ folder of the current directory with the exact file name given. All images 16:9 landscape, as large as the tool allows. Do NOT resize or post-process with scripts; just copy the generated files. No text, no labels, no watermark, no borders (blank sign plates are fine; a simple chart on a screen only where explicitly asked).
+
+EVERY image must be indistinguishable from an ordinary REAL news photograph published by a news agency in <地点> - a staff photographer or drone operator who simply documented what was there. Full-frame camera or DJI drone, 24-35mm, f/5.6-f/8, plain natural exposure, neutral realistic colours, slight sensor noise, mundane slightly imperfect composition with real clutter (<真实的杂物，例如 power lines, utility poles, parked motorbikes, plastic sheeting>). Ordinary real things: <普通的真实物件，例如 ordinary local buildings, roads with guard rails, real hardware such as galvanised poles on concrete footings, grey steel cabinets with padlocks, cable conduit>. NOT cinematic, NOT dramatic lighting, no colour grading, no teal/orange, no glow or bloom, no light rays, no added fog effects, no miniature or toy look, no perfect symmetry, no beautified architecture, no fantasy scale.
+
+Kinds of image:
+[DAY] a new photograph in flat overcast late-afternoon light under heavy dark cloud, ground wet. Follow the stated layout closely.
+[NIGHT of X] an EDIT of the saved file X: the SAME photograph, same camera, same framing, every object in exactly the same place, but taken at NIGHT about an hour after dark, as a real high-ISO night shot: sky nearly black, most of the scene dark but shapes still dimly readable (never pure black), sensor noise in the shadows, and light ONLY from the real sources stated - each a small hard source with modest physically plausible spill on wet surfaces.
+[EDIT of X] an EDIT of the saved file X: change ONLY what is described; camera, framing, exposure and every unchanged pixel stay as identical as possible.
+[DUSK] a new photograph at late dusk (blue hour almost gone), dim, real lamps just on; same realism rules. Also used for interiors at night.
