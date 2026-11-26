@@ -1,4 +1,5 @@
 """Check the motion, native geometry, slide order, file integrity and video stream."""
+
 import io
 import json
 import subprocess
@@ -23,14 +24,29 @@ with ZipFile(deck_file) as archive:
     assert len(gifs) == 3
     for path in gifs:
         with Image.open(io.BytesIO(archive.read(path))) as image:
-            assert image.size == (1280, 720) and image.n_frames > 10 and "loop" not in image.info
+            assert (
+                image.size == (1280, 720)
+                and image.n_frames > 10
+                and "loop" not in image.info
+            )
             first = image.convert("RGB")
             image.seek(image.n_frames - 1)
             assert ImageChops.difference(first, image.convert("RGB")).getbbox()
     diagram = archive.read("ppt/slides/slide4.xml")
     assert b"<p:timing" in diagram and b"17.3" in diagram and b"20 mm" in diagram
-print("Five slides, three one-shot animated illustrations, editable dimension diagram and speaker notes.")
-stream = json.loads(subprocess.check_output(["ffprobe","-v","error","-show_streams","-of","json", str(movie)]))["streams"][0]
-assert stream["codec_name"] == "h264" and (stream["width"], stream["height"]) == (1280, 720)
+print(
+    "Five slides, three one-shot animated illustrations, editable dimension diagram and speaker notes."
+)
+stream = json.loads(
+    subprocess.check_output(
+        ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(movie)]
+    )
+)["streams"][0]
+assert stream["codec_name"] == "h264" and (stream["width"], stream["height"]) == (
+    1280,
+    720,
+)
 assert 19 <= float(stream["duration"]) <= 21
-print(f'{movie.name}: {stream["duration"]} s, {stream["codec_name"]}, {stream["width"]} x {stream["height"]}')
+print(
+    f"{movie.name}: {stream['duration']} s, {stream['codec_name']}, {stream['width']} x {stream['height']}"
+)
