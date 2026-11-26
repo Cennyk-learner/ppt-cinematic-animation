@@ -39,11 +39,28 @@ def camera(section, time):
     lens = (1990 + 50 * turn) * Q
     center_x = (0.654 * W + (850 - 0.654 * W) * turn) * Q
     center_y = (0.606 * H + (375 - 0.606 * H) * turn) * Q
-    rays = forward + ((X - center_x) / lens)[:, :, None] * right + ((center_y - Y) / lens)[:, :, None] * up
+    rays = (
+        forward
+        + ((X - center_x) / lens)[:, :, None] * right
+        + ((center_y - Y) / lens)[:, :, None] * up
+    )
     floor = eye + rays * (-eye[2] / rays[:, :, 2])[:, :, None]
     slope_x = (eye[0] - floor[:, :, 0]) / eye[2]
     slope_y = (eye[1] - floor[:, :, 1]) / eye[2]
-    return forward, eye, right, up, lens, center_x, center_y, rays, floor, slope_x, slope_y
+    return (
+        forward,
+        eye,
+        right,
+        up,
+        lens,
+        center_x,
+        center_y,
+        rays,
+        floor,
+        slope_x,
+        slope_y,
+    )
+
 
 NOISE = np.random.default_rng(121).uniform(-0.8, 0.8, (NY, NX)).astype("f")
 
@@ -313,7 +330,9 @@ def render(section, number, output):
         # A narrow contact shadow and a wider falloff locate each valley, even
         # in the original broadside view where far folded faces overlap.
         face_position = np.minimum(f, 40 - f) / 20
-        recess = 0.24 * (1 - face_position) ** 1.3 + 0.045 * np.exp(-((1 - face_position) / 0.07) ** 2)
+        recess = 0.24 * (1 - face_position) ** 1.3 + 0.045 * np.exp(
+            -(((1 - face_position) / 0.07) ** 2)
+        )
         illum[ispaper] *= (1 - math.sin(a) * recess)[ispaper]
     albs = v(
         [
