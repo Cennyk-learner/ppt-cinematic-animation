@@ -40,7 +40,7 @@ for idx in range(1,5):
         if key.exists():break
         time.sleep(.05)
     else:break
-    controller.gotoNextEffect()
+    controller.gotoNextSlide()
     time.sleep(.22)
     print("Impress page after trigger",idx,controller.getCurrentSlideIndex(),flush=True)
 time.sleep(4.5)

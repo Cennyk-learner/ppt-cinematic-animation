@@ -29,7 +29,7 @@ jobs:
       - name: Render the folding shot and assemble the revised deck
         env:
           BRIDGE_OUT: examples/paper-bridge/frames
-          BRIDGE_WORKERS: '2'
+          BRIDGE_WORKERS: '4'
           OPENBLAS_NUM_THREADS: '1'
           OMP_NUM_THREADS: '1'
         run: |
@@ -37,6 +37,14 @@ jobs:
           python examples/paper-bridge/build_demo.py
           python examples/paper-bridge/verify.py
           ln -s "$GITHUB_WORKSPACE/examples/paper-bridge" /tmp/paper-bridge-built
+      - name: Retain the newly rendered review files
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-bridge-final
+          path: |
+            examples/paper-bridge/output/
+            examples/paper-bridge/assembled/review.jpg
+          retention-days: 30
       - name: Render all native pages through Impress
         run: |
           mkdir -p /tmp/paper-pdf /tmp/paper-live
@@ -72,7 +80,8 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add examples/paper-bridge/{render_scene.py,build_demo.py,verify.py,paper-bridge.pptx,preview.mp4,fold-preview.webp,review.jpg}
+          git add examples/paper-bridge/{render_scene.py,build_demo.py,verify.py,fold-preview.webp,review.jpg}
+          git add -f -- examples/paper-bridge/paper-bridge.pptx examples/paper-bridge/preview.mp4
           git commit -m 'Refresh the editable demonstration and the fold-camera preview'
           git push origin HEAD:refs/heads/experiment/cinematic-visual-storytelling
       - name: Retain the playback checks
