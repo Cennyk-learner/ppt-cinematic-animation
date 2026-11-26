@@ -34,18 +34,35 @@ capture=work/"slideshow.mp4"
 xvfb=subprocess.Popen(["Xvfb",":92","-screen","0","1280x720x24","-nolisten","tcp"],env=env)
 show=None
 writer=None
+control=None
+wm=None
 try:
     time.sleep(1.3)
-    show=subprocess.Popen(["soffice","-env:UserInstallation="+(work/"lo-profile").as_uri(),"--nologo","--norestore","--nofirststartwizard","--show",str(pptx)],env=env)
-    for _ in range(36):
+    wm=subprocess.Popen(["openbox","--sm-disable"],env=env)
+    profile=work/"lo-profile"
+    profile_user=profile/"user"
+    profile_user.mkdir(parents=True,exist_ok=True)
+    (profile_user/"registrymodifications.xcu").write_text('<oor:items xmlns:oor="http://openoffice.org/2001/registry"><item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="ShowTipOfTheDay" oor:op="fuse"><value>false</value></prop></item><item oor:path="/org.openoffice.Setup/Office"><prop oor:name="ooSetupInstCompleted" oor:op="fuse"><value>true</value></prop></item></oor:items>')
+    show=subprocess.Popen(["soffice","-env:UserInstallation="+profile.as_uri(),"--nologo","--norestore","--nofirststartwizard","--accept=socket,host=127.0.0.1,port=2088;urp;StarOffice.ServiceManager"],env=env)
+    control=subprocess.Popen(["/usr/bin/python3",".github/paper-uno.py",str(pptx),str(work)],env=env)
+    for k in range(38):
         time.sleep(1)
-        if centroid(shot())[0]>0:break
-    else:raise RuntimeError("Presentation window did not reach the studio cover")
-    writer=subprocess.Popen(["ffmpeg","-loglevel","error","-y","-f","x11grab","-framerate","20","-video_size","1280x720","-i",":92.0","-t","20","-c:v","libx264","-preset","veryfast","-crf","17","-pix_fmt","yuv420p","-movflags","+faststart",str(capture)],env=env)
+        if (work/"uno-ready").exists() and centroid(shot())[0]>0:break
+        if k in [8,16,26]:
+            subprocess.run(["xdotool","key","Escape"],env=env) if not (work/"uno-ready").exists() else None
+            view=shot()
+            view.thumbnail((640,360))
+            view.save(work/f"startup-{k}.jpg")
+            tree=subprocess.run(["xwininfo","-root","-tree"],env=env,capture_output=True,text=True)
+            print("Display windows",tree.stdout[-3700:],flush=True)
+        if control.poll() is not None and control.returncode!=0:break
+    else:raise RuntimeError("Slideshow cover was not displayed")
+    if not (work/"uno-ready").exists() or centroid(shot())[0]<0:raise RuntimeError("Slideshow failed the cover visual check")
+    writer=subprocess.Popen(["ffmpeg","-loglevel","error","-y","-f","x11grab","-draw_mouse","0","-framerate","20","-video_size","1280x720","-i",":92.0","-t","20","-c:v","libx264","-preset","veryfast","-crf","17","-pix_fmt","yuv420p","-movflags","+faststart",str(capture)],env=env)
     started=time.monotonic()
-    for deadline in [3.4,7.4,11.4,16.0]:
+    for number,deadline in enumerate([3.4,7.4,11.4,16.0],start=1):
         time.sleep(max(0,started+deadline-time.monotonic()))
-        run(["xdotool","key","--clearmodifiers","Right"])
+        (work/f"advance-{number}").touch()
     writer.wait(timeout=20)
     results=[]
     actual_frames=[]
@@ -70,4 +87,6 @@ try:
 finally:
     if writer and writer.poll() is None:writer.terminate()
     if show and show.poll() is None:show.terminate()
+    if control and control.poll() is None:control.terminate()
+    if wm and wm.poll() is None:wm.terminate()
     xvfb.terminate()

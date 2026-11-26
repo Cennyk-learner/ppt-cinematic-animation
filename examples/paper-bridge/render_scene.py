@@ -7,8 +7,6 @@ from multiprocessing import Pool
 W, H = 1280, 720
 Q = 1.25
 NX, NY = int(W * Q), int(H * Q)
-F = 1990 * Q
-CX, CY = 0.654 * NX, 0.606 * NY
 HP, R = 54.0, 21.2
 SECTIONS = {"cover": 1, "flat": 44, "fold": 48, "return": 40}
 pi = math.pi
@@ -22,21 +20,31 @@ def unit(a):
     return a / (np.linalg.norm(a, axis=-1, keepdims=True) + 1e-12)
 
 
-D = unit(v([-0.425, 0.817, -0.415]))
-E = v([0, 0, 39]) - D * 816
-RGT = unit(np.cross(D, v([0, 0, 1])))
-UP = unit(np.cross(RGT, D))
 Y, X = np.mgrid[:NY, :NX].astype("f")
 X += 0.5
 Y += 0.5
-ray = (
-    D[None, None, :]
-    + ((X - CX) / F)[:, :, None] * RGT
-    + ((CY - Y) / F)[:, :, None] * UP
-)
-G = E + ray * (-E[2] / ray[:, :, 2])[:, :, None]
-SX = (E[0] - G[:, :, 0]) / E[2]
-SY = (E[1] - G[:, :, 1]) / E[2]
+
+
+def camera(section, time):
+    # The two loading shots share a locked reference view. Only the folding
+    # shot travels around the paper so its four ridges become legible in depth.
+    turn = ease(0.55, 2.46, time) if section == "fold" else 0.0
+    broadside = unit(v([-0.425, 0.817, -0.415]))
+    end_view = unit(v([-0.86, 0.16, -0.52]))
+    forward = unit((1 - turn) * broadside + turn * end_view)
+    target = v([10 * turn, 0, 39])
+    eye = target - forward * (816 - 51 * turn)
+    right = unit(np.cross(forward, v([0, 0, 1])))
+    up = unit(np.cross(right, forward))
+    lens = (1990 + 50 * turn) * Q
+    center_x = (0.654 * W + (850 - 0.654 * W) * turn) * Q
+    center_y = (0.606 * H + (375 - 0.606 * H) * turn) * Q
+    rays = forward + ((X - center_x) / lens)[:, :, None] * right + ((center_y - Y) / lens)[:, :, None] * up
+    floor = eye + rays * (-eye[2] / rays[:, :, 2])[:, :, None]
+    slope_x = (eye[0] - floor[:, :, 0]) / eye[2]
+    slope_y = (eye[1] - floor[:, :, 1]) / eye[2]
+    return forward, eye, right, up, lens, center_x, center_y, rays, floor, slope_x, slope_y
+
 NOISE = np.random.default_rng(121).uniform(-0.8, 0.8, (NY, NX)).astype("f")
 
 
@@ -181,7 +189,9 @@ def geom(a, sag, gap):
 
 
 def render(section, number, output):
-    a, sag, gap = pose(section, number / 16.0)
+    time = number / 16.0
+    D, E, RGT, UP, F, CX, CY, ray, G, SX, SY = camera(section, time)
+    a, sag, gap = pose(section, time)
     meshes, base, ex = geom(a, sag, gap)
     Z = np.zeros((NY, NX), "f")
     N = np.zeros((NY, NX, 3), "f")
@@ -230,8 +240,8 @@ def render(section, number, output):
     vert = unit(np.cross(side, l))
     fill = unit(v([0.44, 0.71, 0.60]))
     lights = []
-    for k in range(12):
-        r = math.sqrt((k + 0.5) / 12)
+    for k in range(24):
+        r = math.sqrt((k + 0.5) / 24)
         ang = k * 2.3999632
         lights.append(
             unit(
@@ -299,6 +309,12 @@ def render(section, number, output):
         ismass
     ]
     illum = ambient * np.maximum(0.18, ao) + 0.69 * light * visible + 0.115 * back
+    if a > 0.001:
+        # A narrow contact shadow and a wider falloff locate each valley, even
+        # in the original broadside view where far folded faces overlap.
+        face_position = np.minimum(f, 40 - f) / 20
+        recess = 0.24 * (1 - face_position) ** 1.3 + 0.045 * np.exp(-((1 - face_position) / 0.07) ** 2)
+        illum[ispaper] *= (1 - math.sin(a) * recess)[ispaper]
     albs = v(
         [
             [1, 1, 1],
