@@ -28,7 +28,7 @@ description: 把路演、答辩、竞赛、课堂展示 PPT 的静态页（也�
 | 想看做过什么、哪些被否过 | `references/style-library.md` |
 | 开始生图、合成、组装时 | `references/pipeline.md` |
 | 动手写脚本前，以及出了怪问题时 | `references/pitfalls.md` |
-| 想先看一个完整跑通的例子 | `examples/lighthouse/` |
+| 想先看一个完整跑通的例子 | `examples/lighthouse/`（实景气氛与转场）或 `examples/paper-bridge/`（固定参照、三维折叠与原生截面图） |
 
 ## 审美底线（最短的版本）
 

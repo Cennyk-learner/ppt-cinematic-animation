@@ -27,7 +27,7 @@ It is a skill package for AI coding agents (Claude Code, or any agent that can r
 - A **library of 50+ techniques** that were actually built. Each entry lists the film reference, what it is good for and how to build it. **The ones that were rejected are recorded too, along with the reasons.**
 - A **working pipeline**: generate a set of pixel-aligned base images → composite seamless loop GIFs in Python → assemble native animations through PowerPoint COM → export the slideshow to video and check contact sheets.
 - A **typography guide**: which look gives a deck away as AI-made, and for Chinese subjects how to find, compare and set brush, Fangsong and seal-script fonts in vertical columns with carved seals.
-- A [guide to explaining a changing quantity](references/visual-argument.md) with a stable reference, a recurring object, and a helper for packaging a rendered scene as a one-shot GIF in an editable deck.
+- A [guide to explaining a changing quantity](references/visual-argument.md) with a stable reference, a recurring object, and a helper for packaging a rendered scene as a one-shot GIF in an editable deck. The [paper bridge example](examples/paper-bridge/) includes a five-slide PPTX and a playback preview.
 - A **pitfall list**. One example: an animated GIF in PowerPoint starts playing when the slide is entered, not when the GIF appears. Miss that and every narrative animation ends up out of sync.
 - Ready-to-use **Python / PowerShell helpers** and a complete end-to-end example.
 

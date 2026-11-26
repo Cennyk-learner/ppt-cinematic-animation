@@ -229,9 +229,11 @@ def build(frames_root, tool, work, output):
 
 
 def font_for(bold, size):
+    windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
     prefix = "/Applications/Microsoft PowerPoint.app/Contents/Resources/DFonts/"
     candidates = [
         os.environ.get("PAPER_FONT_BOLD" if bold else "PAPER_FONT_REGULAR"),
+        str(windows_fonts / ("msyhbd.ttc" if bold else "msyh.ttc")),
         prefix + ("msyhbd.ttc" if bold else "msyh.ttc"),
         "/usr/share/fonts/opentype/noto/NotoSansCJK-"
         + ("Bold" if bold else "Regular")
