@@ -1,97 +1,68 @@
-name: Verify the PowerPoint review copy
+name: Check exported PowerPoint pages
 on:
   push:
     branches: [experiment/cinematic-visual-storytelling]
-    paths:
-      - '.github/workflows/paper-bridge-review.yml'
+    paths: ['.github/workflows/paper-bridge-review.yml']
 permissions:
   actions: read
-  contents: write
+  contents: read
 jobs:
-  verify:
-    if: github.repository == 'Cennyk-learner/ppt-cinematic-animation' && github.ref == 'refs/heads/experiment/cinematic-visual-storytelling'
+  inspect:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: paper-bridge-playback-check
+          run-id: 45754538965
+          github-token: ${{ github.token }}
+          path: /tmp/proof
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install playback tools
-        run: |
-          python -m pip install Pillow numpy pyyaml ruff python-pptx
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk libreoffice-impress xdotool xvfb poppler-utils openbox python3-uno
-      - name: Check skill metadata and animation helper
-        run: |
-          python .github/paper-skill-validate.py .
-          python .github/paper-frame-check.py scripts/pack_scene_frames.py
-      - name: Render the folding shot and assemble the revised deck
-        env:
-          BRIDGE_OUT: examples/paper-bridge/frames
-          BRIDGE_WORKERS: '4'
-          OPENBLAS_NUM_THREADS: '1'
-          OMP_NUM_THREADS: '1'
-        run: |
-          python examples/paper-bridge/render_scene.py all
-          python examples/paper-bridge/build_demo.py
-          python examples/paper-bridge/verify.py
-          ln -s "$GITHUB_WORKSPACE/examples/paper-bridge" /tmp/paper-bridge-built
-      - name: Retain the newly rendered review files
-        uses: actions/upload-artifact@v4
-        with:
-          name: paper-bridge-final
-          path: |
-            examples/paper-bridge/output/
-            examples/paper-bridge/assembled/review.jpg
-          retention-days: 30
-      - name: Render all native pages through Impress
-        run: |
-          mkdir -p /tmp/paper-pdf /tmp/paper-live
-          soffice -env:UserInstallation=file:///tmp/paper-convert-profile --headless --convert-to pdf --outdir /tmp/paper-pdf /tmp/paper-bridge-built/output/*.pptx
-          python - <<'PY'
-          from pathlib import Path
-          import subprocess
-          pdf=next(Path('/tmp/paper-pdf').glob('*.pdf'))
-          body=subprocess.check_output(['pdftotext',str(pdf),'-']).decode()
-          assert '17.3' in body and body.count('\f')==5, body
-          PY
-      - name: Check a real slideshow with four manual advances
-        run: |
-          python .github/paper-live-check.py /tmp/paper-bridge-built/output /tmp/paper-bridge-built/output/*.mp4 /tmp/paper-live || echo "See the available rendered-motion preview."
-      - name: Package the review files
+      - run: python -m pip install pymupdf Pillow numpy
+      - name: Compare the exported native slides with their embedded first frames
         run: |
           python - <<'PY'
-          import json, shutil
           from pathlib import Path
-          base=Path('examples/paper-bridge')
-          produced=Path('/tmp/paper-bridge-built')
-          live=Path('/tmp/paper-live')
-          ok=(live/'receipt.json').is_file() and json.loads((live/'receipt.json').read_text())['real_slideshow_verified']
-          shutil.copy(next((produced/'output').glob('*.pptx')),base/'paper-bridge.pptx')
-          shutil.copy(live/'slideshow.mp4' if ok else next((produced/'output').glob('*.mp4')),base/'preview.mp4')
-          shutil.copy(live/'live-contact.jpg' if ok else produced/'assembled/review.jpg',base/'review.jpg')
-          print('Selected video:', 'captured Impress slideshow' if ok else 'scene-frame preview with native-layout overlays')
+          from zipfile import ZipFile
+          from xml.etree import ElementTree as ET
+          from PIL import Image
+          import base64, io, posixpath, json
+          import numpy as np
+          import pymupdf
+          src=Path('/tmp/proof')
+          doc=pymupdf.open(next(src.rglob('*.pdf')))
+          zone=(455,150,1235,650)
+          thumbs=Image.new('RGB',(660,558),'#e8e4db')
+          rec=[]
+          with ZipFile('examples/paper-bridge/paper-bridge.pptx') as deck:
+              for idx,page in enumerate(doc):
+                  p=page.get_pixmap(matrix=pymupdf.Matrix(4/3,4/3),alpha=False)
+                  actual=Image.frombytes('RGB',(p.width,p.height),p.samples).resize((1280,720))
+                  thumb=actual.resize((330,186))
+                  thumbs.paste(thumb,((idx%2)*330,(idx//2)*186))
+                  if idx!=3:
+                      root=ET.fromstring(deck.read(f'ppt/slides/_rels/slide{idx+1}.xml.rels'))
+                      rel=next(e for e in root if e.attrib['Type'].endswith('/image'))
+                      media=posixpath.normpath(posixpath.join('ppt/slides',rel.attrib['Target']))
+                      with Image.open(io.BytesIO(deck.read(media))) as f:
+                          embedded=f.convert('RGB').resize((1280,720))
+                      a=np.asarray(actual.crop(zone),dtype=np.int32)
+                      b=np.asarray(embedded.crop(zone),dtype=np.int32)
+                      err=float(np.abs(a-b).mean())
+                      red=(a[:,:,0]>115)&(a[:,:,0]>a[:,:,1]*1.45)&(a[:,:,0]-a[:,:,2]>53)
+                      rec.append((idx+1,round(err,2),int(red.sum())))
+                      assert red.sum()>450 and err<24,(idx,err,red.sum())
+                  else:
+                      assert '17.3' in page.get_text()
+          data=io.BytesIO()
+          thumbs.save(data,format='JPEG',quality=72)
+          encoded=base64.b64encode(data.getvalue()).decode()
+          for i in range(0,len(encoded),4000):
+              print("NATIVE_JPG " + encoded[i:i+4000])
+          print("NATIVE_RESULT",json.dumps(rec))
           PY
-          ffmpeg -loglevel error -y -ss 7.45 -t 3.1 -i examples/paper-bridge/preview.mp4 -vf 'fps=12,scale=640:360' -c:v libwebp_anim -q:v 72 -loop 0 examples/paper-bridge/fold-preview.webp
-          ruff format examples/paper-bridge/*.py
-          du -h examples/paper-bridge/{paper-bridge.pptx,preview.mp4,fold-preview.webp,review.jpg}
-      - name: Save the sample on the review branch
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add examples/paper-bridge/{render_scene.py,build_demo.py,verify.py,fold-preview.webp,review.jpg}
-          git add -f -- examples/paper-bridge/paper-bridge.pptx examples/paper-bridge/preview.mp4
-          git commit -m 'Refresh the editable demonstration and the fold-camera preview'
-          git push origin HEAD:refs/heads/experiment/cinematic-visual-storytelling
-      - name: Retain the playback checks
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: paper-bridge-playback-check
-          path: |
-            /tmp/paper-live/receipt.json
-            /tmp/paper-live/live-contact.jpg
-            /tmp/paper-live/startup-*.jpg
-            /tmp/paper-pdf/*.pdf
-          retention-days: 10
