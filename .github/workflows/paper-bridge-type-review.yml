@@ -1,0 +1,76 @@
+name: Verify editable label alignment
+on:
+  push:
+    branches: [experiment/cinematic-visual-storytelling]
+    paths: ['.github/workflows/paper-bridge-type-review.yml']
+permissions:
+  contents: write
+jobs:
+  check:
+    if: github.repository == 'Cennyk-learner/ppt-cinematic-animation' && github.ref == 'refs/heads/experiment/cinematic-visual-storytelling'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare the text and native-render checks
+        run: |
+          python -m pip install Pillow python-pptx pymupdf
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-noto-cjk libreoffice-impress
+      - name: Apply the same native text settings as the reproducible example
+        working-directory: examples/paper-bridge
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from hashlib import sha256
+          from pptx import Presentation
+          from build_demo import fix_label_bounds
+          deck=Path("paper-bridge.pptx")
+          def media_hashes():
+              with ZipFile(deck) as z:
+                  return {k:sha256(z.read(k)).hexdigest() for k in z.namelist() if k.startswith("ppt/media/")}
+          before=media_hashes()
+          d=Presentation(deck)
+          for slide in d.slides:
+              for shape in slide.shapes:
+                  if shape.has_text_frame and shape.text.strip():
+                      r=shape.text_frame.paragraphs[0].runs[0]
+                      fix_label_bounds(shape,shape.text,r.font.size.pt*4/3,bool(r.font.bold))
+          d.save(deck)
+          assert before==media_hashes()
+          PY
+      - name: Verify the left guide in the actual Office-format export
+        run: |
+          mkdir -p /tmp/paper-align
+          soffice -env:UserInstallation=file:///tmp/paper-align-profile --headless --convert-to pdf --outdir /tmp/paper-align examples/paper-bridge/paper-bridge.pptx
+          python - <<'PY'
+          import pymupdf, base64, io
+          from PIL import Image
+          pdf=pymupdf.open('/tmp/paper-align/paper-bridge.pdf')
+          blocks=pdf[0].get_text('dict')['blocks']
+          spans=[s for b in blocks if b['type']==0 for line in b['lines'] for s in line['spans'] if s['text'].strip()]
+          starts=[round(s['bbox'][0]*4/3,1) for s in spans if '一张纸' in s['text'] or '能撑住' in s['text']]
+          print('NATIVE_TITLE_LEFT', starts)
+          assert len(starts)==2 and all(abs(x-76)<27 for x in starts), starts
+          assert len(pdf)==5 and '17.3' in pdf[3].get_text()
+          contact=Image.new('RGB',(660,558),'#e8e4db')
+          for i,page in enumerate(pdf):
+              p=page.get_pixmap(matrix=pymupdf.Matrix(0.5,0.5),alpha=False)
+              im=Image.frombytes('RGB',(p.width,p.height),p.samples).resize((330,186))
+              contact.paste(im,((i%2)*330,(i//2)*186))
+          data=io.BytesIO()
+          contact.save(data,format='JPEG',quality=72)
+          encoded=base64.b64encode(data.getvalue()).decode()
+          for i in range(0,len(encoded),4000): print('TYPE_JPG '+encoded[i:i+4000])
+          PY
+      - name: Save the verified presentation on this branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- examples/paper-bridge/paper-bridge.pptx
+          git commit -m 'Align the editable PowerPoint titles with the preview'
+          git push origin HEAD:refs/heads/experiment/cinematic-visual-storytelling

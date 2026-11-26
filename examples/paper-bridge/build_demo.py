@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR
-from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.oxml.xmlchemy import OxmlElement
 from pptx.oxml import parse_xml
 from pptx.util import Emu, Pt
@@ -54,6 +54,17 @@ def rgb(hex_color):
     return RGBColor.from_string(hex_color)
 
 
+def fix_label_bounds(box, text, size, bold):
+    """Keep an editable label on its left guide across Office renderers."""
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame._txBody.bodyPr.set("anchorCtr", "0")
+    try:
+        glyph_width = font_for(bold, size).getlength(text)
+    except (OSError, RuntimeError):
+        glyph_width = len(text) * size
+    box.width = min(box.width, emu(math.ceil(glyph_width) + 10))
+
+
 def native_label(slide, name, text, x, y, w, h, size, color, bold=False):
     box = slide.shapes.add_textbox(emu(x), emu(y), emu(w), emu(h))
     box.name = name
@@ -75,6 +86,7 @@ def native_label(slide, name, text, x, y, w, h, size, color, bold=False):
     ea = OxmlElement("a:ea")
     ea.set("typeface", TYPE)
     rpr.append(ea)
+    fix_label_bounds(box, text, size, bold)
     return box.shape_id
 
 
