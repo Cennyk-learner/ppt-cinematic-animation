@@ -89,6 +89,10 @@ for n in night dawn room; do (cat prompts/_full_$n.txt | codex exec --skip-git-r
 - **一幕要有几种动作。** 常见的搭配是：一个带氛围的循环动图垫底，加一两个一次性的透明图层动作，再加原生的线和字。
 - 动图 1280×720、12.5 帧每秒、20 帧一圈，一般 1–5 MB；屏幕里有小字时用 1920×1080。
 
+### 参数驱动的三维机理
+
+连续折叠、遮挡或透视变化需要逐帧表现时，在可复现的场景中锁定照明、机位与比例。输出一段无字的连续图片，用 `python scripts/pack_scene_frames.py path/to/frames output.gif --fps 20` 合为进页单播的镜头。标题和图解在 PPT 内组装。按点击分段、保留末帧，以及移植网页交互时的取舍见 [`visual-argument.md`](visual-argument.md)。
+
 ## 4. 把真实界面放进实景屏幕
 
 有系统界面的单文件 HTML 时，不要截一张图贴上去，把它跑起来。
